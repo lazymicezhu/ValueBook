@@ -1,0 +1,2 @@
+// 公共配置。私密的值放在 Secrets.xcconfig（不进仓库，照 Secrets.example.xcconfig 抄一份）
+#include? "Secrets.xcconfig"

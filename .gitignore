@@ -1,0 +1,19 @@
+# 个人数据与密钥：绝不进仓库
+ValueBook/Seed/
+cloud/.sync-token
+Config/Secrets.xcconfig
+cloud/wrangler.jsonc
+*.vbbackup
+*.ipa
+dist/
+
+# 生成物
+ValueBook.xcodeproj/
+build/
+DerivedData/
+cloud/.wrangler/
+node_modules/
+.claude/
+
+.DS_Store
+xcuserdata/

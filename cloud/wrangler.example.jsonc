@@ -1,0 +1,9 @@
+{
+  "name": "valuebook-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "preview_urls": false,
+  "d1_databases": [
+    { "binding": "DB", "database_name": "valuebook-sync", "database_id": "<your-d1-database-id>" }
+  ]
+}
