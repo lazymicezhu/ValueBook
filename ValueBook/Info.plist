@@ -10,18 +10,6 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>价值账本数据包</string>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>com.lazymice.valuebook.backup</string>
-			</array>
-		</dict>
-		<dict>
-			<key>CFBundleTypeName</key>
 			<string>CSV 账单</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>

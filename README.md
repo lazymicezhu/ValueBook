@@ -15,7 +15,7 @@
 - **账户**：余额、净资产、账户分组，可从净资产里排除某个账户
 - **统计**：按月 / 按年看分类构成和趋势
 - **导入**：随手记导出的 CSV，可以从「文件」选，也可以从微信「用其他应用打开」
-- **数据包**（`.vbbackup`）：整库导出 / 恢复
+- **数据包**（`.vbbackup`）：整库导出备份
 - **云同步**：自建的 Cloudflare Worker + D1，多台设备按记录同步
 
 ## 技术
@@ -28,9 +28,8 @@
 
 ```
 ValueBook/Sources/   App 源码
-ValueBook/Seed/      内置数据（导出脚本生成，不进仓库）
 cloud/               同步服务端
-tools/               导出数据、打包脚本
+tools/               打包脚本
 CHANGELOG.md         版本记录
 ```
 
@@ -54,7 +53,6 @@ open ValueBook.xcodeproj
 | `Config/Secrets.xcconfig` | 同步服务域名 | `Config/Secrets.example.xcconfig` |
 | `cloud/wrangler.jsonc` | D1 数据库 id | `cloud/wrangler.example.jsonc` |
 | `cloud/.sync-token` | 同步密钥 | — |
-| `ValueBook/Seed/` | 内置的个人数据 | — |
 
 ## 打包发布
 
@@ -62,7 +60,7 @@ open ValueBook.xcodeproj
 tools/release.sh 1.2.0   # 新版本；不带参数则只把 build 号加 1
 ```
 
-脚本会依次：导出模拟器里的数据到 `ValueBook/Seed` → 更新 `project.yml` 里的版本号 → Release 编译（不签名）→ 输出到 `dist/价值账本-ValueBook-v<版本>(<build>).ipa` 和对应数据包。签名用自己的证书完成。
+脚本会依次：更新 `project.yml` 里的版本号 → Release 编译（不签名）→ 输出到 `dist/价值账本-ValueBook-v<版本>(<build>).ipa`。签名用自己的证书完成。ipa 里不带数据，装好后在设置 → 云同步里填密钥，数据从云端拉下来。
 
 发布后：
 
@@ -70,7 +68,7 @@ tools/release.sh 1.2.0   # 新版本；不带参数则只把 build 号加 1
 git commit -am "Release v1.2.0" && git tag v1.2.0 && git push --follow-tags
 ```
 
-> ipa 和数据包里含有个人账单数据和同步密钥，不要上传到公开的地方。
+> 导出的数据包里含有个人账单数据，不要上传到公开的地方。
 
 ## 云同步部署
 

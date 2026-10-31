@@ -9,8 +9,8 @@ settings:
     DEVELOPMENT_TEAM: 2R4WYUF984
     CODE_SIGN_STYLE: Automatic
     # 版本号由 tools/release.sh 维护：MARKETING_VERSION 是对外版本，CURRENT_PROJECT_VERSION 每打一次 ipa 加 1
-    MARKETING_VERSION: "1.1.0"
-    CURRENT_PROJECT_VERSION: "2"
+    MARKETING_VERSION: "1.2.0"
+    CURRENT_PROJECT_VERSION: "3"
   configs:
     Debug:
       SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
@@ -23,10 +23,6 @@ targets:
       Release: Config/Base.xcconfig
     sources:
       - ValueBook/Sources
-      # 内置数据（tools/export-sim-data.sh 生成）
-      - path: ValueBook/Seed
-        buildPhase: resources
-        optional: true
     info:
       path: ValueBook/Info.plist
       properties:
@@ -47,10 +43,6 @@ targets:
             UTTypeTagSpecification:
               public.filename-extension: [vbbackup]
         CFBundleDocumentTypes:
-          - CFBundleTypeName: 价值账本数据包
-            CFBundleTypeRole: Editor
-            LSHandlerRank: Owner
-            LSItemContentTypes: [com.lazymice.valuebook.backup]
           - CFBundleTypeName: CSV 账单
             CFBundleTypeRole: Viewer
             LSHandlerRank: Alternate

@@ -44,11 +44,7 @@ struct RootView: View {
         .onOpenURL { url in
             guard url.isFileURL else { return }
             path = []
-            if url.pathExtension.lowercased() == DataPackage.ext {
-                importer.message = DataPackage.restore(from: url, into: context)
-            } else {
-                Task { await importer.importFile(at: url, into: context) }
-            }
+            Task { await importer.importFile(at: url, into: context) }
         }
         .overlay {
             if importer.running {
@@ -83,23 +79,9 @@ struct RootView: View {
             }
         }
         .task {
-            if Seed.needsInstall {
-                importer.stage = "正在导入内置数据，请勿关闭 App…"
-                importer.progress = 0.5
-                importer.running = true
-                try? await Task.sleep(for: .milliseconds(300))   // 先让提示显示出来
-                let log = Seed.installIfNeeded(into: context)
-                importer.running = false
-                importer.message = log
-            }
             Asset.refreshAllAddOns(in: context)
             await cloud.sync(context)
             #if DEBUG
-            // 测试用：启动参数 -restorePath /path/to.vbbackup 直接恢复数据包（会先自动备份）
-            if let path = UserDefaults.standard.string(forKey: "restorePath") {
-                importer.message = DataPackage.restore(from: URL(fileURLWithPath: path), into: context)
-                Asset.refreshAllAddOns(in: context)
-            }
             // 测试用：启动参数 -importPath /path/to.csv 直接导入，-demoAssets YES 从大额数码支出生成物品
             if let path = UserDefaults.standard.string(forKey: "importPath") {
                 let start = Date()

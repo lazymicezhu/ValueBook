@@ -5,8 +5,6 @@ import UniformTypeIdentifiers
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @State private var importing = false
-    @State private var importingPackage = false
-    @State private var confirmRestore: URL?
     @State private var message: String?
     @State private var exportURL: URL?
     @State private var confirmClear = false
@@ -33,7 +31,6 @@ struct SettingsView: View {
 
                 Section {
                     Button {
-                        importingPackage = false
                         importing = true
                     } label: {
                         Label("从「文件」选择 CSV", systemImage: "folder")
@@ -70,22 +67,9 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Button { importingPackage = true; importing = true } label: {
-                        Label("从数据包恢复", systemImage: "arrow.down.doc")
-                    }
                     Button { export { try DataPackage.export(from: context) } } label: {
-                        Label("导出数据包", systemImage: "shippingbox")
+                        Label("导出数据包（全部数据）", systemImage: "shippingbox")
                     }
-                    InfoRow("内置数据", Seed.fingerprint.map { fp in
-                        UserDefaults.standard.string(forKey: Seed.appliedKey) == fp ? "\(fp) · 已导入" : "\(fp) · 未导入"
-                    } ?? "无")
-                } header: {
-                    Text("数据包（全部数据）")
-                } footer: {
-                    Text("数据包（.vbbackup）包含全部流水、物品和账户。恢复会替换当前全部数据，替换前自动备份到「文件」App → 价值账本。也可以在微信 / 文件里用「用其他应用打开」选「价值账本」直接恢复。")
-                }
-
-                Section("导出") {
                     Button { export { try DataTransfer.exportEntries(try context.fetch(FetchDescriptor<LedgerEntry>())) } } label: {
                         Label("导出全部账单 CSV", systemImage: "square.and.arrow.up")
                     }
@@ -95,6 +79,10 @@ struct SettingsView: View {
                     if let exportURL {
                         ShareLink(item: exportURL) { Label("分享 \(exportURL.lastPathComponent)", systemImage: "paperplane") }
                     }
+                } header: {
+                    Text("导出")
+                } footer: {
+                    Text("数据包（.vbbackup）包含全部流水、物品和账户，用作备份。设备之间的数据用云同步。")
                 }
 
                 Section {
@@ -121,11 +109,7 @@ struct SettingsView: View {
                           allowedContentTypes: [.commaSeparatedText, .tabSeparatedText, .plainText, .text, .data]) { result in
                 switch result {
                 case .success(let url):
-                    if importingPackage || url.pathExtension.lowercased() == DataPackage.ext {
-                        confirmRestore = url
-                    } else {
-                        Task { await importer.importFile(at: url, into: context); refreshCounts() }
-                    }
+                    Task { await importer.importFile(at: url, into: context); refreshCounts() }
                 case .failure(let err):
                     message = "选择文件失败：\(err.localizedDescription)"
                 }
@@ -133,13 +117,6 @@ struct SettingsView: View {
             .alert("提示", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
                 Button("好") { message = nil }
             } message: { Text(message ?? "") }
-            .confirmationDialog("用数据包替换当前全部数据？", isPresented: Binding(get: { confirmRestore != nil }, set: { if !$0 { confirmRestore = nil } }),
-                                titleVisibility: .visible) {
-                Button("替换（会先自动备份）", role: .destructive) {
-                    if let url = confirmRestore { message = DataPackage.restore(from: url, into: context) }
-                    refreshCounts()
-                }
-            } message: { Text(confirmRestore?.lastPathComponent ?? "") }
             .confirmationDialog("确定清空所有账单？不可恢复。", isPresented: $confirmClear, titleVisibility: .visible) {
                 Button("清空", role: .destructive) {
                     try? context.delete(model: LedgerEntry.self)
@@ -245,7 +222,7 @@ struct CloudSyncSection: View {
         } header: {
             Text("云同步")
         } footer: {
-            Text("填好密钥后自动同步：改了数据几秒后上传，打开 App 时拉取别的设备的修改。两台设备改了同一条时，后同步的为准。第一次同步以云端为准（先自动备份到「文件」App），本机独有的记录会传上去。开了云同步后，新版 App 里的内置数据不再覆盖本机。")
+            Text("填好密钥后自动同步：改了数据几秒后上传，打开 App 时拉取别的设备的修改。两台设备改了同一条时，后同步的为准。第一次同步以云端为准（先自动备份到「文件」App），本机独有的记录会传上去。")
         }
     }
 }

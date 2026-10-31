@@ -3,6 +3,11 @@
 版本号格式 `主版本.次版本.修订 (build)`，每打一次 ipa，build 加 1。
 Format: `MAJOR.MINOR.PATCH (build)`. The build number goes up by one with every ipa.
 
+## v1.2.0 (3) — 2026-10-31
+
+- 设备间数据只靠云同步：移除 ipa 内置数据（打开新版自动覆盖本机）和「从数据包恢复」，删掉 `tools/export-sim-data.sh`；数据包只保留导出
+  Data moves between devices only through cloud sync: removed the bundled seed data (which overwrote the device on first launch) and "Restore from data package", and dropped `tools/export-sim-data.sh`; data packages are export-only now
+
 ## v1.1.0 (2) — 2026-10-31
 
 - 首页大数字改为**今日支出**，下方显示本月收入、本月支出；下方三格改为本周 / 本月 / 本年
