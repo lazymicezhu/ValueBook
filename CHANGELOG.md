@@ -3,6 +3,11 @@
 版本号格式 `主版本.次版本.修订 (build)`，每打一次 ipa，build 加 1。
 Format: `MAJOR.MINOR.PATCH (build)`. The build number goes up by one with every ipa.
 
+## v1.3.1 (5) — 2026-11-07
+
+- 同步密钥编译进 App（来自不进仓库的 `Config/Secrets.xcconfig` 的 `SYNC_TOKEN`），设置里不填密钥也能同步；填了就用填的。ipa 里因此带着密钥，只给自己装，不要外传
+  The sync token is now built into the app (from `SYNC_TOKEN` in `Config/Secrets.xcconfig`, which stays out of git), so sync works without entering a token in Settings; a token entered there still takes priority. The ipa therefore contains the token: install it only on your own devices and don't share it
+
 ## v1.3.0 (4) — 2026-11-07
 
 - 「什么时候可以换」改为**使用年限**：从第一笔付款起用满设定的年数就可以换，之后加配件、续费不再推迟；老数据按原来的达标日自动换算成年数

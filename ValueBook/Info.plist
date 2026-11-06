@@ -46,6 +46,8 @@
 	<true/>
 	<key>SyncURL</key>
 	<string>https://$(SYNC_HOST)</string>
+	<key>SyncToken</key>
+	<string>$(SYNC_TOKEN)</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>UILaunchScreen</key>

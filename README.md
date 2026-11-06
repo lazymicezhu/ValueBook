@@ -52,7 +52,7 @@ open ValueBook.xcodeproj
 
 | 本地文件 | 内容 | 样例 |
 |---|---|---|
-| `Config/Secrets.xcconfig` | 同步服务域名 | `Config/Secrets.example.xcconfig` |
+| `Config/Secrets.xcconfig` | 同步服务域名、同步密钥（编译进 App） | `Config/Secrets.example.xcconfig` |
 | `cloud/wrangler.jsonc` | D1 数据库 id | `cloud/wrangler.example.jsonc` |
 | `cloud/.sync-token` | 同步密钥 | — |
 
@@ -62,7 +62,7 @@ open ValueBook.xcodeproj
 tools/release.sh 1.2.0   # 新版本；不带参数则只把 build 号加 1
 ```
 
-脚本会依次：更新 `project.yml` 里的版本号 → Release 编译（不签名）→ 输出到 `dist/价值账本-ValueBook-v<版本>(<build>).ipa`。签名用自己的证书完成。ipa 里不带数据，装好后在设置 → 云同步里填密钥，数据从云端拉下来。
+脚本会依次：更新 `project.yml` 里的版本号 → Release 编译（不签名）→ 输出到 `dist/价值账本-ValueBook-v<版本>(<build>).ipa`。签名用自己的证书完成。ipa 里不带数据，但带着同步密钥（来自 `Config/Secrets.xcconfig` 的 `SYNC_TOKEN`），装好后直接从云端拉数据。**ipa 只给自己装，不要外传或上传到 Release**，拿到它就能读写云端数据。
 
 发布后：
 
@@ -82,4 +82,4 @@ wrangler secret put SYNC_TOKEN
 wrangler deploy
 ```
 
-然后在 App 的设置 → 云同步里填入同一个 token。
+然后把同一个 token 写进 `Config/Secrets.xcconfig` 的 `SYNC_TOKEN`，编译时会打进 App；也可以在 App 的设置 → 云同步里手动填（填了的优先）。

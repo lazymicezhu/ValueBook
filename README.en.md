@@ -54,7 +54,7 @@ These files stay local and are git-ignored; the repo only has examples with plac
 
 | Local file | Contents | Example |
 |---|---|---|
-| `Config/Secrets.xcconfig` | sync server host | `Config/Secrets.example.xcconfig` |
+| `Config/Secrets.xcconfig` | sync server host and sync token (built into the app) | `Config/Secrets.example.xcconfig` |
 | `cloud/wrangler.jsonc` | D1 database id | `cloud/wrangler.example.jsonc` |
 | `cloud/.sync-token` | sync token | — |
 
@@ -64,7 +64,7 @@ These files stay local and are git-ignored; the repo only has examples with plac
 tools/release.sh 1.2.0   # new version; with no argument it only bumps the build number
 ```
 
-The script updates the version in `project.yml`, does an unsigned Release build, and writes `dist/价值账本-ValueBook-v<version>(<build>).ipa`. Sign it with your own certificate. The ipa carries no data: after installing, enter the token under Settings → Cloud Sync and the data comes down from the server.
+The script updates the version in `project.yml`, does an unsigned Release build, and writes `dist/价值账本-ValueBook-v<version>(<build>).ipa`. Sign it with your own certificate. The ipa carries no data but does contain the sync token (`SYNC_TOKEN` from `Config/Secrets.xcconfig`), so after installing it pulls the data straight from the server. **Install the ipa only on your own devices; never share it or upload it to a Release**, since anyone holding it can read and write your cloud data.
 
 Then:
 
@@ -84,4 +84,4 @@ wrangler secret put SYNC_TOKEN
 wrangler deploy
 ```
 
-Then enter the same token under Settings → Cloud Sync in the app.
+Then put the same token in `SYNC_TOKEN` in `Config/Secrets.xcconfig` so it gets built into the app; you can also enter it under Settings → Cloud Sync, which takes priority.

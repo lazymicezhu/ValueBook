@@ -18,6 +18,11 @@ final class CloudSync {
         let url = Bundle.main.object(forInfoDictionaryKey: "SyncURL") as? String ?? ""
         return url == "https://" ? "" : url
     }()
+    /// 默认密钥，编译时从 Config/Secrets.xcconfig 的 SYNC_TOKEN 注入；设置里填了就用填的
+    nonisolated static let defaultToken: String = {
+        let t = (Bundle.main.object(forInfoDictionaryKey: "SyncToken") as? String ?? "").trimmingCharacters(in: .whitespaces)
+        return t.hasPrefix("$(") ? "" : t
+    }()
     nonisolated private static let urlKey = "sync.url"
     nonisolated private static let tokenKey = "sync.token"
     nonisolated private static let lastKey = "sync.last"
@@ -31,12 +36,17 @@ final class CloudSync {
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Self.urlKey) }
     }
     var token: String {
-        get { UserDefaults.standard.string(forKey: Self.tokenKey) ?? "" }
+        get {
+            let t = UserDefaults.standard.string(forKey: Self.tokenKey) ?? ""
+            return t.isEmpty ? Self.defaultToken : t
+        }
         set { UserDefaults.standard.set(newValue.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Self.tokenKey) }
     }
     var enabled: Bool { !token.isEmpty && URL(string: serverURL) != nil }
     /// 内置数据判断用（不在主线程也能读）
-    nonisolated static var configured: Bool { !(UserDefaults.standard.string(forKey: tokenKey) ?? "").isEmpty }
+    nonisolated static var configured: Bool {
+        !(UserDefaults.standard.string(forKey: tokenKey) ?? "").isEmpty || !defaultToken.isEmpty
+    }
 
     private var pending: Task<Void, Never>?
     private var again = false
