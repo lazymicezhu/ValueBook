@@ -326,7 +326,7 @@ private struct Snapshot {
 enum SyncedSettings {
     static func synced(_ key: String) -> Bool {
         key.hasPrefix("rate.") || key.hasPrefix("catOrder.") || key.hasPrefix("pick.")
-            || key == "accountGroups" || key == "assetSort"
+            || key == "accountGroups" || key == "assetSort" || key == Asset.minAmortizeKey
     }
 
     static func current() -> [String: Any] {
@@ -369,10 +369,19 @@ private struct AssetRecord: Codable {
     var purchaseDate, createdAt: Date
     var retiredDate: Date?
     var price, lifeYears, residualRate, salePrice, targetDailyCost: Double
+    /// 新版字段，老记录里没有
+    var targetYears: Double?
+    var groupName: String?
+    var groupRank: Int?
+    var groupManual: Bool?
+    var groupItemRank: Int?
     var isRetired: Bool
     var valuations: Data?
 
     init(_ a: Asset) {
+        targetYears = a.targetYears
+        groupName = a.groupName
+        groupRank = a.groupRank; groupManual = a.groupManual; groupItemRank = a.groupItemRank
         name = a.name; category = a.category; method = a.methodRaw; note = a.note
         purchaseDate = a.purchaseDate; createdAt = a.createdAt; retiredDate = a.retiredDate
         price = a.price; lifeYears = a.lifeYears; residualRate = a.residualRate; salePrice = a.salePrice
@@ -384,6 +393,9 @@ private struct AssetRecord: Codable {
         a.purchaseDate = purchaseDate; a.createdAt = createdAt; a.retiredDate = retiredDate
         a.price = price; a.lifeYears = lifeYears; a.residualRate = residualRate; a.salePrice = salePrice
         a.targetDailyCost = targetDailyCost; a.isRetired = isRetired; a.valuationsData = valuations
+        a.targetYears = targetYears ?? 0
+        a.groupName = groupName ?? ""
+        a.groupRank = groupRank ?? 0; a.groupManual = groupManual ?? false; a.groupItemRank = groupItemRank ?? 0
     }
 }
 

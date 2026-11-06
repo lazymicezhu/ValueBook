@@ -132,13 +132,24 @@ struct EntryEditView: View {
                     Button { dismiss() } label: { Image(systemName: "xmark") }
                 }
                 ToolbarItem(placement: .principal) { Text(entry == nil ? "记一笔" : "编辑").font(.headline) }
-                ToolbarItem(placement: .confirmationAction) {
-                    if focus != nil {
-                        Button("完成") { focus = nil }
-                    } else if entry != nil {
+                if focus == nil && entry != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button("删除这笔", role: .destructive) { confirmDelete = true }
                         } label: { Image(systemName: "ellipsis") }
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if focus != nil {
+                        // 正在输备注等文字：先收起键盘
+                        Button("完成") { focus = nil }
+                    } else {
+                        // 和键盘上的「完成」一样：有算式先算出结果，再保存
+                        Button("完成") {
+                            if hasOperator, let r = result { expr = Calc.format(r) }
+                            save()
+                        }
+                        .fontWeight(.semibold)
                     }
                 }
             }
@@ -272,16 +283,17 @@ struct EntryEditView: View {
                 }
                 FieldRow(icon: "target", title: "目标") {
                     if useTarget {
-                        TextField("目标日均", text: $targetText)
+                        TextField("想用几年", text: $targetText)
                             .keyboardType(.decimalPad)
                             .focused($focus, equals: .target)
                             .onChange(of: targetText) { _, _ in if focus == .target { targetEdited = true } }
-                        Text("元/天").foregroundStyle(Theme.tertiary)
-                        if let r = result, r > 0, let t = Double(targetText), t > 0 {
-                            Text("用满 \(Int((r / t).rounded(.up))) 天").font(.caption).foregroundStyle(Theme.secondary)
+                        Text("年").foregroundStyle(Theme.tertiary)
+                        if let y = Double(targetText), y > 0 {
+                            Text("\(Fmt.day.string(from: date.adding(days: max(Int((y * 365).rounded()), 1) - 1))) 可换")
+                                .font(.caption).foregroundStyle(Theme.secondary)
                         }
                     } else {
-                        Text("不设目标").foregroundStyle(Theme.tertiary)
+                        Text("不设年限").foregroundStyle(Theme.tertiary)
                         Spacer()
                     }
                     Toggle("", isOn: $useTarget.animation()).labelsHidden().tint(Theme.accent)
@@ -513,8 +525,8 @@ struct EntryEditView: View {
     }
 
     private func suggestTarget() {
-        guard !targetEdited, let r = result, r > 0 else { return }
-        targetText = String(format: "%g", AssetCategory.suggestedTarget(price: r, category: assetCategory))
+        guard !targetEdited else { return }
+        targetText = String(format: "%g", AssetCategory.targetYears(assetCategory))
     }
 
     private func save() {
@@ -561,7 +573,7 @@ struct EntryEditView: View {
             let d = AssetCategory.defaults(assetCategory)
             let a = Asset(name: name.isEmpty ? "未命名物品" : name, category: assetCategory, purchaseDate: date,
                           price: e.cny, method: d.0, lifeYears: d.1, residualRate: d.2, note: note)
-            a.targetDailyCost = useTarget ? (Double(targetText) ?? AssetCategory.suggestedTarget(price: a.price, category: assetCategory)) : 0
+            a.targetYears = useTarget ? (Double(targetText).flatMap { $0 > 0 ? $0 : nil } ?? AssetCategory.targetYears(assetCategory)) : 0
             context.insert(a)
             e.assetID = a.id
         }

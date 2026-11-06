@@ -149,8 +149,18 @@ final class Asset {
     var note: String = ""
     var valuationsData: Data?
     var createdAt: Date = Date()
-    /// 目标日均花费：日均降到这个数，就算「用回本了」，可以换了。0 表示没设
+    /// 旧版的目标日均花费（元/天）。新版改用 targetYears，这个只用来换算老数据
     var targetDailyCost: Double = 0
+    /// 想用多少年：从第一笔付款起用满这么久就可以换了。0 表示没设
+    var targetYears: Double = 0
+    /// 用户自建的大类（如「AI 与云服务」），把几件物品归到一起看合计。空表示不归类
+    var groupName: String = ""
+    /// 所在大类的排位（同一大类的物品值相同），1 起；0 表示没手动排过，按离换新最近
+    var groupRank: Int = 0
+    /// 所在大类是否手动排序组内物品（同一大类的物品值相同）
+    var groupManual: Bool = false
+    /// 在大类里的手动排位，1 起；0 表示没排过
+    var groupItemRank: Int = 0
     /// 附属账目（配件、续费）的金额合计和明细，由 refreshAddOns 根据流水维护
     var addOnTotal: Double = 0
     var addOnsData: Data?

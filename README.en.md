@@ -9,10 +9,12 @@ The app UI is in Chinese.
 ## Features
 
 - **Bookkeeping**: income, expenses and transfers across multiple accounts and currencies (HKD, USD, etc. are converted to CNY at the rates you set)
-- **Home**: today's spending, this month's income and spending, a daily spending chart for the month, and week / month / year totals
+- **Home**: today's spending, this month's income and spending, a daily spending chart for the month, week / month / year totals, and today's entries
 - **Items**: turn a purchase from your ledger into an item, and attach accessories or renewals to it as add-on entries
-  - **Daily cost**: each payment is divided by the days since it was paid, and the results are added up
-  - **Target daily cost**: once the daily cost drops to your target, the item is marked "ready to replace", and the app predicts the date it gets there
+  - **Daily cost**: each payment is divided by the days since it was paid, and the results are added up; for items with a planned lifespan, a new payment is spread over at least 7 / 30 / 60 days (set in Settings)
+  - **Planned lifespan**: set how many years you want to use an item; once that many years have passed since the first payment it is marked "ready to replace", and later accessories or renewals don't push the date back
+  - **Groups**: your own groups (e.g. "Photography", "Furniture") show a combined daily cost; retired items count as (cost − sale price) spread up to today; groups and the items inside them can be reordered, and groups can be collapsed
+  - **Charts**: items with a lifespan show a daily-cost curve; items without one, like subscriptions, show monthly spending bars
   - **Depreciation**: straight-line or accelerated, plus manual resale valuations
 - **Accounts**: balances, net worth, account groups, and excluding an account from net worth
 - **Stats**: category breakdowns and trends by month or year

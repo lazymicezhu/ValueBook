@@ -4,6 +4,8 @@ import SwiftUI
 enum Theme {
     static let income = Color(red: 0.94, green: 0.47, blue: 0.42)
     static let expense = Color(red: 0.38, green: 0.80, blue: 0.60)
+    /// 「已处置」小章
+    static let stamp = Color(red: 0.94, green: 0.47, blue: 0.42)
     static let accent = Color(red: 0.87, green: 0.75, blue: 0.56)
     static let accentGradient = LinearGradient(colors: [Color(red: 0.93, green: 0.82, blue: 0.64), Color(red: 0.80, green: 0.66, blue: 0.46)],
                                                startPoint: .topLeading, endPoint: .bottomTrailing)

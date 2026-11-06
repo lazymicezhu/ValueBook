@@ -7,6 +7,8 @@ enum Route: Hashable {
     case period(title: String, start: Date, end: Date)
     case account(String)
     case category(type: String, name: String)
+    case asset(UUID)
+    case assetGroup(String)
 }
 
 extension View {
@@ -24,6 +26,8 @@ extension View {
                 FilteredFlowView(title: title, filter: Filters.range(start, end), showYear: start.days(to: end) > 40)
             case let .account(name): AccountDetailView(name: name)
             case let .category(type, name): FilteredFlowView(title: name, filter: Filters.category(type, name))
+            case let .asset(id): AssetByID(id: id)
+            case let .assetGroup(name): AssetGroupView(name: name)
             }
         }
     }
@@ -44,9 +48,10 @@ struct HomeView: View {
     @State private var editing: LedgerEntry?
 
     init() {
-        var d = FetchDescriptor<LedgerEntry>(sortBy: [SortDescriptor(\LedgerEntry.date, order: .reverse)])
-        d.fetchLimit = 6
-        _recentAll = Query(d)
+        // 今日记录：今天 0 点以后的账单
+        let today = Calendar.current.startOfDay(for: .now)
+        _recentAll = Query(filter: #Predicate<LedgerEntry> { $0.date >= today },
+                           sort: \LedgerEntry.date, order: .reverse)
     }
 
     private struct Period {
@@ -124,7 +129,7 @@ struct HomeView: View {
                     }
 
                     HStack {
-                        Text("最近记录").font(.headline)
+                        Text("今日记录").font(.headline)
                         Spacer()
                         NavigationLink(value: Route.flow) {
                             HStack(spacing: 2) { Text("全部流水"); Image(systemName: "chevron.right").font(.caption2) }
@@ -137,7 +142,7 @@ struct HomeView: View {
                         if recentAll.isEmpty {
                             VStack(spacing: 8) {
                                 Image(systemName: "tray").font(.title2).foregroundStyle(Theme.tertiary)
-                                Text("还没有记录，点下方 + 记一笔，或在设置里导入随手记").font(.footnote).foregroundStyle(Theme.secondary)
+                                Text("今天还没有记录，点下方 + 记一笔").font(.footnote).foregroundStyle(Theme.secondary)
                             }
                             .frame(maxWidth: .infinity)
                             .padding(28)
@@ -145,7 +150,7 @@ struct HomeView: View {
                         VStack(spacing: 0) {
                             ForEach(Array(recentAll.enumerated()), id: \.element.id) { i, e in
                                 Button { editing = e } label: {
-                                    EntryRow(entry: e, showDate: true).padding(.horizontal, 16).padding(.vertical, 12)
+                                    EntryRow(entry: e, showDate: false).padding(.horizontal, 16).padding(.vertical, 12)
                                 }
                                 .buttonStyle(.plain)
                                 if i < recentAll.count - 1 { Rectangle().fill(Theme.separator).frame(height: 0.5).padding(.leading, 64) }

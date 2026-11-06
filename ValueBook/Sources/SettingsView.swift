@@ -4,6 +4,7 @@ import UniformTypeIdentifiers
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
+    @AppStorage(Asset.minAmortizeKey) private var minAmortize = 30
     @State private var importing = false
     @State private var message: String?
     @State private var exportURL: URL?
@@ -61,6 +62,18 @@ struct SettingsView: View {
                     }
                 }
 
+                Section {
+                    Picker("每笔最少摊", selection: $minAmortize) {
+                        Text("7 天").tag(7)
+                        Text("30 天").tag(30)
+                        Text("60 天").tag(60)
+                    }
+                } header: {
+                    Text("日均花费")
+                } footer: {
+                    Text("刚付的钱前几天按这么多天摊，免得新买东西、新加配件后日均一下子冲得特别高。过了这些天就是实际天数。不设年限的物品（如 AI、云服务这类订阅）不受影响，一直按实际天数。")
+                }
+
                 Section("分类与账户") {
                     NavigationLink { CategorySortView() } label: { Label("分类排序", systemImage: "arrow.up.arrow.down") }
                     NavigationLink { AccountGroupsView() } label: { Label("账户分类与归属", systemImage: "folder") }
@@ -93,8 +106,8 @@ struct SettingsView: View {
 
                 Section("说明") {
                     Text("""
-                    • 日均花费 = 每一笔钱 ÷ 它付款到今天的天数，再相加（卖掉的话扣除卖出价）
-                    • 日均降到目标日均，就算用回本了，可以换
+                    • 日均花费 = 每一笔钱 ÷ 它付款到今天的天数，再相加（卖掉的话扣除卖出价）；刚付的钱至少按上面设的天数摊
+                    • 用满设定的年限，就可以换了
                     • 配件、续费可以挂在物品下，一起算进日均
                     """).font(.footnote).foregroundStyle(.secondary)
                 }

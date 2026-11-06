@@ -85,6 +85,11 @@ extension Asset {
         a.valuationsData = valuationsData
         a.createdAt = createdAt
         a.targetDailyCost = targetDailyCost
+        a.targetYears = targetYears
+        a.groupName = groupName
+        a.groupRank = groupRank
+        a.groupManual = groupManual
+        a.groupItemRank = groupItemRank
         a.addOnTotal = addOnTotal
         a.addOnsData = addOnsData
         a.firstAddOnDate = firstAddOnDate

@@ -89,13 +89,27 @@ extension Asset {
     }
 
     /// 某天的日均：那天及之前付的每一笔，各自 ÷（付款日到那天的天数），再加起来
-    static func dailyCost(of payments: [ValuePoint], at end: Date) -> Double {
+    /// floor：是否给刚付的钱设最少摊销天数（只对设了年限、要换新的物品；订阅这类不设年限的按实际天数）
+    static func dailyCost(of payments: [ValuePoint], at end: Date, floor useFloor: Bool = true) -> Double {
         let d = end.startOfDay
+        let floor = useFloor ? Double(minAmortizeDays) : 1
         return payments.reduce(0) { sum, p in
             guard p.date.startOfDay <= d else { return sum }
-            return sum + p.value / Double(p.date.days(to: d) + 1)
+            // 刚付的钱至少按 minAmortizeDays 天摊，免得付款头几天日均冲得特别高
+            return sum + p.value / max(Double(p.date.days(to: d) + 1), floor)
         }
     }
+
+    /// 每一笔钱最少摊多少天（设置里可选 7 / 30 / 60），默认 30
+    static let minAmortizeKey = "amortizeMinDays"
+    static var minAmortizeDays: Int {
+        let v = UserDefaults.standard.integer(forKey: minAmortizeKey)
+        return v > 0 ? v : 30
+    }
+
+    /// 是否按最少天数摊：设了年限（会换新）的才摊；AI、云服务这类不设年限的按实际天数。
+    /// 等同于 hasTarget，但不用为老数据去算达标日，便宜
+    var usesMinAmortize: Bool { targetYears > 0 || targetDailyCost > 0 }
 
     /// 日均折旧：已损失的价值 ÷ 持有天数
     var dailyDepreciation: Double {
@@ -109,15 +123,29 @@ extension Asset {
     func dailyCost(at date: Date, addOns: [ValuePoint]? = nil) -> Double {
         let end = isRetired ? min(date, retiredDate ?? date) : date
         let sold = isRetired && date.startOfDay >= (retiredDate ?? date).startOfDay
-        return Self.dailyCost(of: payments(addOns: addOns, sold: sold), at: end)
+        return Self.dailyCost(of: payments(addOns: addOns, sold: sold), at: end, floor: usesMinAmortize)
     }
 
-    var hasTarget: Bool { targetDailyCost > 0 }
+    /// 想用多少年。老数据只存了目标日均的，按当时的达标日换算成年数（保留一位小数）
+    var effectiveTargetYears: Double {
+        if targetYears > 0 { return targetYears }
+        guard targetDailyCost > 0 else { return 0 }
+        let reach = Self.reachDate(of: payments(), target: targetDailyCost)
+        let days = max(startDate.days(to: reach) + 1, 1)
+        return max((Double(days) / 365 * 10).rounded() / 10, 0.1)
+    }
 
-    /// 达标那天：所有已付的钱都算进去后，日均第一次降到目标的那天（之后不再续费的前提下）
+    var hasTarget: Bool { effectiveTargetYears > 0 }
+
+    /// 达标那天：从第一笔付款起用满目标年数的那天，跟花了多少钱无关
     var targetDate: Date? {
-        guard hasTarget else { return nil }
-        return Self.reachDate(of: payments(), target: targetDailyCost)
+        guard let total = targetTotalDays else { return nil }
+        return startDate.adding(days: total - 1).startOfDay
+    }
+
+    /// 用满目标年数那天的日均（只作参考）
+    var dailyCostAtTarget: Double? {
+        targetDate.map { Self.dailyCost(of: payments(), at: $0) }
     }
 
     /// 这些钱付完、之后不再付的前提下，日均第一次降到 target 的那天
@@ -134,11 +162,14 @@ extension Asset {
     }
 
     /// 从开始到达标一共要用多少天
-    var targetTotalDays: Int? { targetDate.map { max(startDate.days(to: $0) + 1, 1) } }
+    var targetTotalDays: Int? {
+        let y = effectiveTargetYears
+        return y > 0 ? max(Int((y * 365).rounded()), 1) : nil
+    }
 
-    var daysLeft: Int? { targetDate.map { max(Date.now.days(to: $0), 0) } }
+    var daysLeft: Int? { targetTotalDays.map { max($0 - daysHeld(), 0) } }
 
-    var reachedTarget: Bool { hasTarget && dailyCost <= targetDailyCost + 0.0001 }
+    var reachedTarget: Bool { targetTotalDays.map { daysHeld() >= $0 } ?? false }
 
     var targetProgress: Double {
         guard let total = targetTotalDays, total > 0 else { return 0 }

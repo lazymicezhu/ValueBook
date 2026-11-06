@@ -14,7 +14,7 @@ struct AssetEditView: View {
     @State private var priceText = ""
     @State private var targetText = ""
     @State private var targetEdited = false
-    /// 有的物品（比如订阅）不需要目标日均
+    /// targetText 是想用的年数。有的物品（比如订阅）不需要设
     @State private var useTarget = true
     @State private var method: DepreciationMethod = .accelerated
     @State private var lifeYears = 4.0
@@ -23,6 +23,10 @@ struct AssetEditView: View {
     @State private var addExpense = false
     @State private var account = ""
     @State private var loaded = false
+    @State private var groupName = ""
+    @State private var askGroup = false
+    @State private var newGroup = ""
+    @Query private var allAssets: [Asset]
 
     private var price: Double? { Double(priceText).flatMap { $0 >= 0 ? $0 : nil } }
 
@@ -46,8 +50,31 @@ struct AssetEditView: View {
                         Text("买入价格")
                         TextField("0.00", text: $priceText).keyboardType(.decimalPad).multilineTextAlignment(.trailing)
                     }
-                    .onChange(of: priceText) { _, _ in suggestTarget() }
                     DatePicker("买入日期", selection: $date, displayedComponents: .date)
+                    HStack {
+                        Text("大类")
+                        Spacer()
+                        Menu {
+                            Button("不归类") { groupName = "" }
+                            let names = Set(AssetGroups.names(allAssets) + (groupName.isEmpty ? [] : [groupName])).sorted()
+                            if !names.isEmpty {
+                                Divider()
+                                ForEach(names, id: \.self) { n in
+                                    Button { groupName = n } label: {
+                                        if n == groupName { Label(n, systemImage: "checkmark") } else { Text(n) }
+                                    }
+                                }
+                            }
+                            Divider()
+                            Button { newGroup = ""; askGroup = true } label: { Label("新建大类…", systemImage: "plus") }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Text(groupName.isEmpty ? "不归类" : groupName)
+                                Image(systemName: "chevron.up.chevron.down").font(.caption)
+                            }
+                            .foregroundStyle(groupName.isEmpty ? .secondary : Theme.accent)
+                        }
+                    }
                 }
 
                 TargetSection(price: price, purchaseDate: date, addOns: asset?.addOns ?? [], enabled: $useTarget,
@@ -60,6 +87,14 @@ struct AssetEditView: View {
                         Toggle("同时在账本记一笔支出", isOn: $addExpense)
                         if addExpense { TextField("付款账户", text: $account) }
                     }
+                }
+            }
+            .alert("新建大类", isPresented: $askGroup) {
+                TextField("如 摄影、家具", text: $newGroup)
+                Button("取消", role: .cancel) {}
+                Button("好") {
+                    let n = newGroup.trimmingCharacters(in: .whitespaces)
+                    if !n.isEmpty { groupName = n }
                 }
             }
             .navigationTitle(asset == nil ? "添加物品" : "编辑物品")
@@ -76,7 +111,8 @@ struct AssetEditView: View {
                     name = a.name; category = a.category; date = a.purchaseDate
                     priceText = String(format: "%g", a.price); method = a.method
                     lifeYears = a.lifeYears; residualPct = a.residualRate * 100; note = a.note
-                    if a.hasTarget { targetText = String(format: "%g", a.targetDailyCost); targetEdited = true }
+                    groupName = a.groupName
+                    if a.hasTarget { targetText = String(format: "%g", a.effectiveTargetYears); targetEdited = true }
                     useTarget = a.hasTarget
                 } else if let e = source {
                     name = e.note.isEmpty ? e.subcategory : e.note
@@ -92,10 +128,10 @@ struct AssetEditView: View {
         }
     }
 
-    /// 用户没手动改过目标时，按类别推荐一个
+    /// 用户没手动改过年数时，按类别推荐一个
     private func suggestTarget() {
-        guard !targetEdited || targetText.isEmpty, let price, price > 0 else { return }
-        targetText = String(format: "%g", AssetCategory.suggestedTarget(price: price, category: category))
+        guard !targetEdited || targetText.isEmpty else { return }
+        targetText = String(format: "%g", AssetCategory.targetYears(category))
     }
 
     private func save() {
@@ -105,11 +141,13 @@ struct AssetEditView: View {
         a.category = category
         a.purchaseDate = date
         a.price = price
-        a.targetDailyCost = useTarget ? (Double(targetText) ?? 0) : 0
+        a.targetYears = useTarget ? max(Double(targetText) ?? 0, 0) : 0
+        a.targetDailyCost = 0
         a.method = method
         a.lifeYears = lifeYears
         a.residualRate = residualPct / 100
         a.note = note
+        AssetGroups.assign(a, to: groupName, in: allAssets)
         if asset == nil {
             context.insert(a)
             if let source {
@@ -130,59 +168,63 @@ struct AssetEditView: View {
     }
 }
 
-/// 设置目标日均花费
+/// 设置想用多少年：用满就可以换了，跟花了多少钱无关
 struct TargetSection: View {
     let price: Double?
     let purchaseDate: Date
-    /// 附属账目（各自按付款日平摊）
+    /// 附属账目（各自按付款日平摊），只用来估算到时的日均
     var addOns: [ValuePoint] = []
     @Binding var enabled: Bool
+    /// 年数
     @Binding var targetText: String
     @Binding var edited: Bool
 
     var body: some View {
         Section {
-            Toggle("设定目标日均", isOn: $enabled.animation())
+            Toggle("设定使用年限", isOn: $enabled.animation())
             if enabled {
-            HStack {
-                Text("目标日均")
-                TextField("如 10", text: $targetText)
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .onChange(of: targetText) { _, _ in edited = true }
-                Text("元/天").foregroundStyle(.secondary)
-            }
-            if let price, price > 0 {
                 HStack {
-                    Text("按年数").font(.subheadline).foregroundStyle(.secondary)
+                    Text("想用")
+                    TextField("如 3", text: $targetText)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: targetText) { _, _ in edited = true }
+                    Text("年").foregroundStyle(.secondary)
+                }
+                HStack {
                     ForEach([1.0, 2, 3, 5, 8], id: \.self) { y in
                         Button("\(Int(y))年") {
-                            targetText = String(format: "%g", AssetCategory.niceRound(price / (y * 365)))
+                            targetText = String(format: "%g", y)
                             edited = true
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.small)
                     }
                 }
-                if let t = Double(targetText), t > 0 {
-                    let payments = [ValuePoint(date: purchaseDate, value: price)] + addOns
+                if let y = Double(targetText), y > 0 {
+                    let payments = [ValuePoint(date: purchaseDate, value: price ?? 0)] + addOns
                     let start = payments.map(\.date).min() ?? purchaseDate
-                    let reach = Asset.reachDate(of: payments, target: t)
-                    let days = max(start.days(to: reach) + 1, 1)
-                    let left = Date.now.days(to: reach)
-                    Text(left > 0
-                         ? "要用满 \(days) 天（约 \(String(format: "%.1f", Double(days) / 365)) 年），\(Fmt.day.string(from: reach)) 达标，还有 \(left) 天"
-                         : "要用满 \(days) 天，已经在 \(Fmt.day.string(from: reach)) 达标，可以换了 ✓")
-                        .font(.caption)
-                        .foregroundStyle(left > 0 ? Color.secondary : Color.green)
+                    let total = max(Int((y * 365).rounded()), 1)
+                    let reach = start.adding(days: total - 1)
+                    let left = total - max(start.days(to: .now) + 1, 1)
+                    let cost = Asset.dailyCost(of: payments, at: reach)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(left > 0
+                             ? "用满 \(total) 天，\(Fmt.day.string(from: reach)) 可以换，还有 \(left) 天"
+                             : "已经用满 \(total) 天（\(Fmt.day.string(from: reach))），可以换了 ✓")
+                            .foregroundStyle(left > 0 ? Color.secondary : Color.green)
+                        if (price ?? 0) > 0 {
+                            Text("按现有花费，到那天日均约 \(Fmt.yuan(cost))/天").foregroundStyle(.secondary)
+                        }
+                    }
+                    .font(.caption)
                 }
-            }
             }
         } header: {
             Text("什么时候可以换")
         } footer: {
-            Text(enabled ? "日均花费：每一笔钱（买入、配件、续费）各自 ÷ 它付款到今天的天数，再加起来。用得越久日均越低，降到目标就算用回本了，可以换新的。"
-                 : "不设目标：只记录日均花费，不显示进度和达标提醒。适合订阅、会员这类一直在用的东西。")
+            Text(enabled ? "从第一笔付款起用满这么多年就可以换新的，之后再加配件、续费也不会推迟。日均花费照常记录，只作参考。"
+                 : "不设年限：只记录日均花费，不显示进度和达标提醒。适合订阅、会员这类一直在用的东西。")
         }
     }
 }

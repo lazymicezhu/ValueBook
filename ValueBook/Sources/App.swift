@@ -98,7 +98,7 @@ struct RootView: View {
                 for e in all.prefix(8) {
                     let a = Asset(name: e.note.isEmpty ? "数码 \(Fmt.day.string(from: e.date))" : e.note, category: "数码",
                                   purchaseDate: e.date, price: e.cny, method: .accelerated, lifeYears: 4, residualRate: 0.1)
-                    a.targetDailyCost = AssetCategory.suggestedTarget(price: a.price, category: "数码")
+                    a.targetYears = AssetCategory.targetYears("数码")
                     context.insert(a)
                     e.assetID = a.id
                 }

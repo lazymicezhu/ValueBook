@@ -15,7 +15,7 @@ struct AssetDetailView: View {
     @State private var confirmDelete = false
 
     var body: some View {
-        let curve = asset.dailyCostSeries()
+        let curve = asset.usesMinAmortize ? asset.dailyCostSeries() : []
         let today = asset.dailyCost
         List {
             Section {
@@ -36,7 +36,7 @@ struct AssetDetailView: View {
                 if asset.hasTarget && !asset.isRetired {
                     VStack(alignment: .leading, spacing: 8) {
                         if asset.reachedTarget {
-                            Label("已达到目标 \(Fmt.yuan(asset.targetDailyCost))/天，可以换了！", systemImage: "checkmark.seal.fill")
+                            Label("已经用满 \(String(format: "%g", asset.effectiveTargetYears)) 年，可以换了！", systemImage: "checkmark.seal.fill")
                                 .foregroundStyle(.green).font(.headline)
                             if let d = asset.targetDate {
                                 Text("\(Fmt.day.string(from: d)) 达标，已经多用了 \(d.days(to: .now)) 天")
@@ -44,13 +44,14 @@ struct AssetDetailView: View {
                             }
                         } else {
                             HStack {
-                                Text("目标 \(Fmt.yuan(asset.targetDailyCost))/天")
+                                Text("目标用 \(String(format: "%g", asset.effectiveTargetYears)) 年")
                                 Spacer()
                                 Text("还要用 \(asset.daysLeft ?? 0) 天").bold()
                             }
                             ProgressView(value: asset.targetProgress)
                             if let d = asset.targetDate {
-                                Text("预计 \(Fmt.day.string(from: d)) 达标（第 \(asset.targetTotalDays ?? 0) 天），之后就可以换了")
+                                Text("\(Fmt.day.string(from: d)) 用满（第 \(asset.targetTotalDays ?? 0) 天），之后就可以换了"
+                                     + (asset.dailyCostAtTarget.map { "，按现有花费到时日均约 \(Fmt.yuan($0))/天" } ?? ""))
                                     .font(.caption).foregroundStyle(.secondary)
                             }
                         }
@@ -58,9 +59,15 @@ struct AssetDetailView: View {
                     .padding(.vertical, 4)
                 }
 
-                DailyCostChart(asset: asset, curve: curve, today: today, selected: $selected)
+                if asset.usesMinAmortize {
+                    DailyCostChart(asset: asset, curve: curve, today: today, selected: $selected)
+                } else {
+                    MonthlySpendChart(asset: asset)
+                }
             } footer: {
-                Text("曲线是到每一天为止的日均花费，到今天为止。每次付款那天会跳高，之后慢慢降下来；按住曲线可以看某一天。")
+                Text(asset.usesMinAmortize
+                     ? "曲线是到每一天为止的日均花费，到今天为止。每次付款那天会跳高，之后慢慢降下来；按住曲线可以看某一天。"
+                     : "柱子是每个月在它身上花的钱，虚线是月均；按住可以看某个月。")
             }
 
             AddOnSection(asset: asset, showAttach: $showAttach, showAddEntry: $showAddEntry)
@@ -174,6 +181,9 @@ private struct AddOnSection: View {
     /// 挂在这件物品下的全部账单：买入那笔 + 附属账目
     @Query private var linked: [LedgerEntry]
     @State private var editing: LedgerEntry?
+    /// 分页：每页 5 笔
+    @State private var page = 0
+    private let pageSize = 5
 
     init(asset: Asset, showAttach: Binding<Bool>, showAddEntry: Binding<Bool>) {
         self.asset = asset
@@ -188,11 +198,17 @@ private struct AddOnSection: View {
 
     var body: some View {
         Section {
-            // 手动添加、没有对应账单的物品，补一行买入
-            if !linked.contains(where: { !$0.isAddOn }) {
+            // 手动添加、没有对应账单的物品，补一行买入（算作列表里的第一条）
+            let synthetic = !linked.contains(where: { !$0.isAddOn })
+            let count = linked.count + (synthetic ? 1 : 0)
+            let pages = max((count + pageSize - 1) / pageSize, 1)
+            let p = min(page, pages - 1)
+            let lo = p * pageSize, hi = min(lo + pageSize, count)
+            let off = synthetic ? 1 : 0
+            if synthetic && lo == 0 {
                 row(title: "\(asset.category) · 买入", date: asset.purchaseDate, detail: "买入", amount: Fmt.yuan(asset.price), cny: asset.price)
             }
-            ForEach(linked) { e in
+            ForEach(Array(linked[max(lo - off, 0)..<max(hi - off, 0)])) { e in
                 Button { editing = e } label: {
                     row(title: e.displayCategory, date: e.date,
                         detail: [e.isAddOn ? "" : "买入", e.note].filter { !$0.isEmpty }.joined(separator: " · "),
@@ -202,6 +218,19 @@ private struct AddOnSection: View {
                 .swipeActions {
                     if e.isAddOn { Button("移出") { detach(e) }.tint(.orange) }
                 }
+            }
+            if pages > 1 {
+                HStack {
+                    Button { page = p - 1 } label: { Image(systemName: "chevron.left") }
+                        .disabled(p == 0)
+                    Spacer()
+                    Text("第 \(p + 1) / \(pages) 页 · 共 \(count) 笔")
+                        .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                    Spacer()
+                    Button { page = p + 1 } label: { Image(systemName: "chevron.right") }
+                        .disabled(p >= pages - 1)
+                }
+                .buttonStyle(.borderless)
             }
             if !addOns.isEmpty {
                 InfoRow("一共花了", Fmt.yuan(asset.totalCost))
@@ -229,7 +258,7 @@ private struct AddOnSection: View {
                 Text(amount).monospacedDigit().foregroundStyle(.secondary)
                 // 这一笔自己的日均：金额 ÷ 付款到今天（或处置日）的天数
                 let end = asset.isRetired ? (asset.retiredDate ?? .now) : .now
-                Text("\(Fmt.yuan(Asset.dailyCost(of: [ValuePoint(date: date, value: cny)], at: end)))/天")
+                Text("\(Fmt.yuan(Asset.dailyCost(of: [ValuePoint(date: date, value: cny)], at: end, floor: asset.usesMinAmortize)))/天")
                     .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
             }
         }
@@ -327,7 +356,7 @@ private struct DailyCostChart: View {
         // 付款当天日均会冲得很高，纵轴以「今天的日均」为基准，冲出去的部分裁掉，曲线才看得清
         // 同时保证曲线在横轴前 15% 之内就进入画面，左边不留大片空白
         let early = curve.first { $0.date >= start.adding(days: span * 15 / 100) }?.value ?? 0
-        let yMax = max(today * 2.5, early, asset.hasTarget ? asset.targetDailyCost * 1.6 : 0, 0.01)
+        let yMax = max(today * 2.5, early, 0.01)
         let payDays = asset.payments().map(\.date).filter { $0 >= start && $0 <= end }
         VStack(spacing: 6) {
         Chart {
@@ -343,11 +372,6 @@ private struct DailyCostChart: View {
                 PointMark(x: .value("日期", d), y: .value("日均", 0))
                     .symbolSize(18)
                     .foregroundStyle(Theme.accent.opacity(0.7))
-            }
-            if asset.hasTarget {
-                RuleMark(y: .value("目标", asset.targetDailyCost))
-                    .foregroundStyle(.green.opacity(0.8))
-                    .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
             }
             // 今天的点
             PointMark(x: .value("日期", end), y: .value("日均", min(today, yMax)))
@@ -411,12 +435,6 @@ private struct DailyCostChart: View {
                 Capsule().fill(Theme.accent).frame(width: 14, height: 3)
                 Text("日均花费")
             }
-            if asset.hasTarget {
-                HStack(spacing: 5) {
-                    HStack(spacing: 2) { ForEach(0..<3, id: \.self) { _ in Capsule().fill(.green).frame(width: 4, height: 2) } }
-                    Text("目标 \(Fmt.yuan(asset.targetDailyCost))")
-                }
-            }
             HStack(spacing: 5) {
                 Circle().fill(Theme.accent.opacity(0.7)).frame(width: 5, height: 5)
                 Text("付款日")
@@ -425,5 +443,116 @@ private struct DailyCostChart: View {
         }
         .font(.caption2)
         .foregroundStyle(.secondary)
+    }
+}
+
+/// 不设年限的物品（订阅、云服务这类）：每月花费柱状图。
+/// 这类每次续费日均都会冲高，画日均曲线全是锯齿，按月看花了多少更清楚
+private struct MonthlySpendChart: View {
+    let asset: Asset
+    @State private var selected: Date?
+
+    private struct Month: Identifiable {
+        var date: Date
+        var amount: Double
+        var id: Date { date }
+    }
+
+    private var months: [Month] {
+        let cal = Calendar.current
+        let end = asset.isRetired ? (asset.retiredDate ?? .now) : .now
+        let pays = asset.payments()
+        guard let first = pays.map(\.date).min() else { return [] }
+        func monthStart(_ d: Date) -> Date { cal.date(from: cal.dateComponents([.year, .month], from: d))! }
+        var sums: [Date: Double] = [:]
+        for p in pays { sums[monthStart(p.date), default: 0] += p.value }
+        var list: [Month] = []
+        var m = monthStart(first)
+        let last = monthStart(max(end, first))
+        while m <= last {
+            list.append(Month(date: m, amount: sums[m] ?? 0))
+            m = cal.date(byAdding: .month, value: 1, to: m)!
+        }
+        return list
+    }
+
+    var body: some View {
+        let data = months
+        let avg = data.isEmpty ? 0 : data.reduce(0) { $0 + $1.amount } / Double(data.count)
+        let pick = selected.flatMap { s in
+            data.first { Calendar.current.isDate($0.date, equalTo: s, toGranularity: .month) }
+        }
+        VStack(spacing: 6) {
+            Chart {
+                ForEach(data) { m in
+                    BarMark(x: .value("月份", m.date, unit: .month), y: .value("花费", m.amount))
+                        .foregroundStyle(Theme.accent.opacity(pick == nil || pick?.date == m.date ? 1 : 0.35))
+                        .cornerRadius(2)
+                }
+                if avg > 0 {
+                    RuleMark(y: .value("月均", avg))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                }
+                if let pick {
+                    RuleMark(x: .value("月份", pick.date, unit: .month))
+                        .foregroundStyle(.clear)
+                        .annotation(position: .top, overflowResolution: .init(x: .fit(to: .chart), y: .disabled)) {
+                            VStack(spacing: 2) {
+                                Text(pick.date.formatted(.dateTime.year().month())).font(.caption2).foregroundStyle(.secondary)
+                                Text(Fmt.yuan(pick.amount)).font(.caption.bold().monospacedDigit())
+                            }
+                            .padding(.horizontal, 8).padding(.vertical, 5)
+                            .background(Theme.cardHigh, in: RoundedRectangle(cornerRadius: 8))
+                        }
+                }
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .month, count: max(data.count / 4, 1))) { _ in
+                    AxisGridLine().foregroundStyle(.white.opacity(0.06))
+                    AxisValueLabel(format: .dateTime.year(.twoDigits).month(.defaultDigits))
+                }
+            }
+            .chartYAxis {
+                AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) { v in
+                    AxisGridLine().foregroundStyle(.white.opacity(0.06))
+                    AxisValueLabel { Text(Fmt.short(v.as(Double.self) ?? 0)) }
+                }
+            }
+            .chartXSelection(value: $selected)
+            .frame(height: 200)
+            .padding(.top, 8)
+            HStack(spacing: 14) {
+                HStack(spacing: 5) {
+                    RoundedRectangle(cornerRadius: 2).fill(Theme.accent).frame(width: 8, height: 10)
+                    Text("每月花费")
+                }
+                HStack(spacing: 5) {
+                    HStack(spacing: 2) { ForEach(0..<3, id: \.self) { _ in Capsule().fill(.white.opacity(0.5)).frame(width: 4, height: 2) } }
+                    Text("月均 \(Fmt.yuan(avg))")
+                }
+                Spacer()
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .padding(.bottom, 4)
+        }
+    }
+}
+
+/// 按 id 打开物品详情（导航路由用）；物品被删了就显示空页面
+struct AssetByID: View {
+    @Query private var found: [Asset]
+
+    init(id: UUID) {
+        _found = Query(filter: #Predicate<Asset> { $0.id == id })
+    }
+
+    var body: some View {
+        if let a = found.first {
+            AssetDetailView(asset: a)
+        } else {
+            ContentUnavailableView("物品已删除", systemImage: "shippingbox")
+        }
     }
 }
